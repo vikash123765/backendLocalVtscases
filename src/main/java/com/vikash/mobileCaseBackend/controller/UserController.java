@@ -219,6 +219,11 @@ public class UserController {
 
     }
 
+/*    @GetMapping("addToCartLimit")
+    public ResponseEntity<String>numberOfAvailableProducts(@RequestHeader("productId") Integer productId, @RequestHeader("count") Integer count){
+        return productService.numberOfAvailableProducts(productId,count);
+
+    }*/
 
 
 }

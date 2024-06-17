@@ -3,14 +3,11 @@ package com.vikash.mobileCaseBackend.service;
 
 import com.vikash.mobileCaseBackend.model.OrderEntity;
 import com.vikash.mobileCaseBackend.model.Product;
-import com.vikash.mobileCaseBackend.model.ProductOrderSnapshot;
 import com.vikash.mobileCaseBackend.model.User;
 import com.vikash.mobileCaseBackend.model.enums.IncreasOrDeacrease;
 import com.vikash.mobileCaseBackend.model.enums.Type;
 import com.vikash.mobileCaseBackend.repo.*;
-import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -29,16 +26,8 @@ public class ProductService {
 
     @Autowired
     IRepoUser iRepoUser;
-    @Autowired
-    AdminService adminService; // Assuming you have an AdminService for marking product availability
-    @Autowired
-    IProductOrderSnapshot repoProductOrderSnapshot;
-   
-    @Autowired
-    iRepoProductOrder productOrderRepository;
 
 
-    private LocalDateTime lastExecutionTime = LocalDateTime.now();
 
     public String addProduct(String email, String tokenValue, Product productPost) {
 
@@ -312,73 +301,6 @@ public class ProductService {
 
 
     }
-
-
-
-
-
-
-    @Scheduled(fixedRate = 30) // Run every 5 minutes
-    @Transactional
-    public void updateProductStock() {
-        LocalDateTime currentExecutionTime = LocalDateTime.now();
-
-        // Fetch the last snapshot
-        List<ProductOrderSnapshot> lastSnapshots = repoProductOrderSnapshot.findBySnapshotTimeAfter(lastExecutionTime.minusMinutes(5));
-
-        // Fetch current product orders
-        List<Object[]> currentProductOrders = productOrderRepository.findProductOrderQuantities();
-
-        // Create a map of last snapshots for easy comparison
-        Map<Integer, Long> lastSnapshotMap = new HashMap<>();
-        for (ProductOrderSnapshot snapshot : lastSnapshots) {
-            lastSnapshotMap.put(snapshot.getProductId(), snapshot.getQuantity());
-        }
-
-        // Create snapshots for current product orders
-        List<ProductOrderSnapshot> newSnapshots = new ArrayList<>();
-        boolean hasChanges = false; // Flag to track if there are any changes
-        for (Object[] result : currentProductOrders) {
-            Integer productId = (Integer) result[0];
-            Long quantity = (Long) result[1];
-
-            // Check if the quantity has changed compared to the last snapshot
-            Long lastQuantity = lastSnapshotMap.getOrDefault(productId, 0L);
-            Long changeInQuantity = quantity - lastQuantity;
-
-            if (changeInQuantity != 0) {
-                hasChanges = true; // Set the flag if there are changes
-                // Update stock based on the change in quantity
-                Product product = repoProduct.findById(productId).orElse(null);
-                if (product != null) {
-                    int updatedStock = product.getStock() - changeInQuantity.intValue();
-                    if (updatedStock < 0) {
-                        updatedStock = 0;
-                    }
-                    product.setStock(updatedStock);
-                    if (updatedStock <= 0) {
-                        product.setProductAvailable(false);
-                    }
-                    repoProduct.save(product);
-                }
-            }
-
-            // Save the new snapshot
-            ProductOrderSnapshot snapshot = new ProductOrderSnapshot();
-            snapshot.setProductId(productId);
-            snapshot.setQuantity(quantity);
-            snapshot.setSnapshotTime(currentExecutionTime);
-            newSnapshots.add(snapshot);
-        }
-
-        if (hasChanges) {
-            repoProductOrderSnapshot.saveAll(newSnapshots);
-        }
-        // Update the last execution time to the current time
-        lastExecutionTime = currentExecutionTime;
-    }
-
-
 
 
 
